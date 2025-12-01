@@ -449,7 +449,7 @@ struct num *add_num(struct num *n1, struct num *n2)
 								}
 								if (sub_handled == 0) {
 									unsigned char mask = 0;
-									for (int k=j; k<8; ++k) {
+									for (int k=0; k<=j; ++k) {
 										(sum->binary_digits)[sum_byte_index] += (1 << 7-k);
 									}	
 									long int curr_sum_byte_index = sum_byte_index - 1;
@@ -459,8 +459,8 @@ struct num *add_num(struct num *n1, struct num *n2)
 									}
 									mask = 0;
 									for (int k=0; k<8; ++k) {
-										if (( (sum->binary_digits)[sum_byte_index] ^ (1 << k) ) == 0) {
-											(sum->binary_digits)[sum_byte_index] += (1 << k);		
+										if (( (~((sum->binary_digits)[curr_sum_byte_index])) & (1 << k) )) {
+											(sum->binary_digits)[curr_sum_byte_index] += (1 << k);		
 										}
 										else {
 											for (int l=0; l<8; ++l) {
@@ -468,7 +468,7 @@ struct num *add_num(struct num *n1, struct num *n2)
 													mask += (1 << l);
 												}
 											}
-											(sum->binary_digits)[sum_byte_index] &= mask;
+											(sum->binary_digits)[curr_sum_byte_index] &= mask;
 											break;
 										}
 									}
@@ -780,6 +780,14 @@ struct num *mul_num(struct num *n1, struct num *n2)
 // precision must be positive
 struct num *inverse_num(struct num *n, struct num *precision)
 {
+	long int precision_bytes_after_radix = (precision->len - 1) - (precision->radix_point_index);
+
+	char *n_str = num_to_char(n);
+	long int n_str_len = strlen(n_str);
+	if (n_str_len > 10) {
+		n_str[10] = 0;
+		n_str_len = 10;
+	}
 	struct num *one = new_num(1,0);
 	one->binary_digits[0] = 1;
 	struct num *initial_guess = 0;
@@ -816,6 +824,7 @@ struct num *inverse_num(struct num *n, struct num *precision)
 	        free_num(temp2);
 		free_num(curr_approx);
 		curr_approx = next_approx;
+		free(next_approx_str);
 		struct num *prod = mul_num(curr_approx, n);
 	        struct num *error = sub_num(prod, one);
 		error->sign = 0;
@@ -836,31 +845,27 @@ struct num *inverse_num(struct num *n, struct num *precision)
 		printf("current  error:%s\n", curr_error_str);
 		free(curr_error_str);
 		free_num(error);
+		if (((curr_approx->len-1) - curr_approx->radix_point_index) > (precision_bytes_after_radix+1)) {
+			curr_approx->binary_digits = realloc(curr_approx->binary_digits, curr_approx->radix_point_index + precision_bytes_after_radix + 2);
+			curr_approx->len = curr_approx->radix_point_index + precision_bytes_after_radix + 2;
+
+		}
 		++iter_no;	
 	}
 }
 
 struct num *div_num(struct num *n1, struct num *n2)
 {
-	struct num *result = new_num(1,0);
-        long int shift = (((n2->radix_point_index + 1)*8) - 1)*-1;
-        for (int i=0; i<n2->len; ++i) {
-                for (int j=0; j<8; ++j) {
-                        if ((n2->binary_digits)[i] & (1 << (7-j))) {
-                                struct num *temp = rshift_num(n1, shift);
-                                struct num *temp_result = result;
-                                result = add_num(temp_result, temp);
-                                free_num(temp);
-                                free_num(temp_result);
-                        }
-                        ++shift;
-                }
-        }
+	struct num *precision = new_num(n2->len+1,0);
+	precision->binary_digits[n2->len] = 1;
+	struct num *n2_reciprical = inverse_num(n2, precision);
+	free_num(precision);
+	struct num *result = mul_num(n1, n2_reciprical);
+	free_num(n2_reciprical);
 	return result;
 }
 
-struct num *mod_num(struct num *n1, struct num *n2)
+void set_num_char(struct num *n, char *s) 
 {
-		
+			
 }
-
