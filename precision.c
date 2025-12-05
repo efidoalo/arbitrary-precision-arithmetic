@@ -63,7 +63,8 @@ unsigned char *obtain_next_integer_temp_array(unsigned char **temp_integer_array
 		*returned_len = 1;
 		return *temp_integer_array;
 	}
-	unsigned char carry = 0, temp_carry = 0, temp_val = 0;
+	unsigned char carry = 0, temp_carry = 0;
+        int temp_val = 0;
 	for (int i=(len-1); i>=0; --i) {
 		temp_val = (2*(*temp_integer_array)[i]) + carry;
 		if (temp_val > 9) {
@@ -175,16 +176,20 @@ void add_integer_array(unsigned char **integer_array,
                        long int temp_integer_array_len,
 		       long int *returned_integer_array_len)
 {
-	unsigned char temp_carry = 0, temp_val = 0, carry = 0;
+	unsigned char temp_carry = 0, carry = 0;
+	int temp_val = 0;
+	int no_of_extra_digits = temp_integer_array_len - integer_array_len;
 	for (int i=integer_array_len-1; i>=0; --i) {
-		temp_val = (*integer_array)[i] + (*temp_integer_array)[i] + carry;
+		temp_val = (*integer_array)[i] + (*temp_integer_array)[i+no_of_extra_digits] + carry;
 		if (temp_val > 9) {
 			carry = 1;
 			temp_val -= 10;
 		}
+		else {
+			carry = 0;
+		}
 		(*integer_array)[i] = temp_val;
 	}
-	int no_of_extra_digits = temp_integer_array_len - integer_array_len;
 	for (int i=(no_of_extra_digits-1);
 	     i>=0; --i) {
 		(*integer_array) = (unsigned char *)realloc(*integer_array,
@@ -341,7 +346,7 @@ struct num *grt_num(struct num *n1, struct num *n2)
 		long int radix_difference = n2->radix_point_index - n1->radix_point_index;
                 for (int i=0; i<radix_difference; ++i) {
                         if ((n2->binary_digits)[i]) {
-                                return n1;
+                                return n2;
                         }
                 }
                 long int n2_len = (n2->len) - radix_difference;
@@ -391,6 +396,27 @@ struct num *copy_num(struct num *n)
 
 struct num *add_num(struct num *n1, struct num *n2)
 {
+	unsigned char n2_is_zero = 1;
+	for (int i=0; i<n2->len; ++i) {
+		if (n2->binary_digits[i] != 0) {
+			n2_is_zero = 0; 
+		}
+	}
+	if (n2_is_zero) {
+		struct num *res = copy_num(n1);
+		return res;
+	}
+	unsigned char n1_is_zero = 1;
+	for (int i=0; i<n1->len; ++i) {
+                if (n1->binary_digits[i] != 0) {
+                        n1_is_zero = 0;
+                }
+        }
+        if (n1_is_zero) {
+                struct num *res = copy_num(n2);
+                return res;
+        }
+
 	if (n1->sign != n2->sign) {
 		//
 		if (grt_num(n1,n2)==n1) {
@@ -781,7 +807,7 @@ struct num *mul_num(struct num *n1, struct num *n2)
 struct num *inverse_num(struct num *n, struct num *precision)
 {
 	long int precision_bytes_after_radix = (precision->len - 1) - (precision->radix_point_index);
-
+	
 	char *n_str = num_to_char(n);
 	long int n_str_len = strlen(n_str);
 	if (n_str_len > 10) {
@@ -792,16 +818,30 @@ struct num *inverse_num(struct num *n, struct num *precision)
 	one->binary_digits[0] = 1;
 	struct num *initial_guess = 0;
 	struct num *cmp_num = grt_num(one, n);
-	if (cmp_num == one) {
-		initial_guess = new_num(1,0);
-		(initial_guess->binary_digits)[0] = 2;
-	}
-	else if (cmp_num == n) {
-		long int shift_val = -((n->radix_point_index + 2)*8);
-		initial_guess = rshift_num(one, shift_val);
+	if (cmp_num == 0) {
+		return one;
 	}
 	else {
-		return one;
+		long int largest_power = 0;
+		for (int i=0; i<n->len; ++i) {
+			for (int j=0; j<8; ++j) {
+				if (n->binary_digits[i] & (1 << (7-j))) {
+					if (i <= n->radix_point_index) {
+						largest_power = (n->radix_point_index - i)*8 + (7-j);
+						goto power_found;
+					}
+					else {
+						largest_power = - (((n->radix_point_index - i)-1)*8 +(j+1));
+						goto power_found;	
+					}
+				}
+			}
+		}
+		power_found:
+		largest_power *= -1;
+		struct num *temp = new_num(1,0);
+		temp->binary_digits[0] = 1;
+		initial_guess = rshift_num(temp, largest_power);
 	}
 	struct num *two = new_num(1,0); 
 	(two->binary_digits)[0] = 2;
@@ -815,11 +855,6 @@ struct num *inverse_num(struct num *n, struct num *precision)
 		free_num(temp1);
 		struct num *next_approx = mul_num(curr_approx, temp2);
 		char *next_approx_str = num_to_char(next_approx);
-                int next_approx_str_len = strlen(next_approx_str);
-                if (display_digit_precision < next_approx_str_len) {
-                        next_approx_str_len = display_digit_precision;
-                }
-                next_approx_str[display_digit_precision] = 0;
 		printf("next approximation is: %s\n", next_approx_str);
 	        free_num(temp2);
 		free_num(curr_approx);
@@ -838,10 +873,6 @@ struct num *inverse_num(struct num *n, struct num *precision)
 		}
 		char *curr_error_str = num_to_char(error);
 		int curr_error_str_len = strlen(curr_error_str);
-                if (5 < curr_error_str_len) {
-                        curr_error_str_len = 5;
-                }
-		curr_error_str[curr_error_str_len] = 0;
 		printf("current  error:%s\n", curr_error_str);
 		free(curr_error_str);
 		free_num(error);
