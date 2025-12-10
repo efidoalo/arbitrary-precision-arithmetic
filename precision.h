@@ -53,19 +53,12 @@ struct num *mul_num(struct num *n1, struct num *n2);
 // returns n1 / n2, leaving n1 and n2 unchanged
 struct num *div_num(struct num* n1, struct num *n2);
 
-// returns n1 mod n2, leaving n1 and n2 unchanged
-struct num *mod_num(struct num* n1, struct num *n2);
-
 // finds the ijnverse of n, within precision given by prec
 struct num *inverse_num(struct num *n, struct num *prec);
 
-// sets n to the decimal floating number string s that is null terminated
-// . if no radix is present it sets n to  an integer.
-// The closest representable value is chosen
-void set_num_char(struct num* n, char *s);
-
-// sets n to the integer given by val
-void set_num_int(struct num *n, long int val);
+// sets n in place to the integer given by val of sign s where s==0 for positive
+// , 1 for negative
+void set_num_int(struct num **n, unsigned long int val, unsigned char s);
 
 // returns a null terminated decimal digit string representation of n
 char *num_to_char(struct num *n);

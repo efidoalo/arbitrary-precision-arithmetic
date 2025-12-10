@@ -896,7 +896,32 @@ struct num *div_num(struct num *n1, struct num *n2)
 	return result;
 }
 
-void set_num_char(struct num *n, char *s) 
+void set_num_int(struct num **n, unsigned long int val, unsigned char s) 
 {
-			
+	int val_size = sizeof(unsigned long int);
+	if ((*n)==0) {
+		*n = (struct num *)malloc(sizeof(struct num));
+		if ((*n)==0) {
+			printf("Error allocating memory for number n. %s.\n",
+				strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+	else {
+		free((*n)->binary_digits);
+	}
+	(*n)->binary_digits = (unsigned char *)malloc(val_size);	
+	if (((*n)->binary_digits) == 0) {
+		printf("Error allocating memory for binary_digits array.%s.\n",
+			strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	(*n)->len = val_size;
+	unsigned char *int_bytes = (unsigned char *)&val;
+	for (int i=0; i<val_size; ++i) {
+		((*n)->binary_digits)[val_size-1-i] = *int_bytes;
+	       	++int_bytes;	
+	}	
+	(*n)->sign = s;
+	(*n)->radix_point_index = val_size-1;
 }
